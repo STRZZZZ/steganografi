@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steganografi Web App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .tab-hidden {
+            display: none;
+        }
+        .dropzone {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 25px;
+            text-align: center;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .dropzone.active {
+            border-color: #4CAF50;
+            background-color: #f0f8ff;
+        }
+        #imagePreview {
+            max-width: 100%;
+            max-height: 300px;
+            margin-top: 10px;
+            display: none;
+        }
+        #hiddenMessage {
+            resize: vertical;
+            min-height: 100px;
+        }
+        .result-box {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            word-wrap: break-word;
+        }
+        .action-btn {
+            transition: all 0.3s;
+        }
+        .action-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <h1 class="text-3xl font-bold text-center text-blue-600 mb-2">Steganografi Web App</h1>
+        <p class="text-center text-gray-600 mb-8">Sembunyikan dan ekstrak pesan rahasia dalam gambar</p>
+        
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+            <!-- Tab Navigation -->
+            <div class="flex border-b">
+                <button id="encodeTab" class="flex-1 py-4 px-6 font-medium text-center border-b-2 border-blue-500 text-blue-600 bg-blue-50">Sembunyikan Pesan</button>
+                <button id="decodeTab" class="flex-1 py-4 px-6 font-medium text-center text-gray-500 hover:text-blue-500">Ekstrak Pesan</button>
+            </div>
+            
+            <!-- Encode Tab Content -->
+            <div id="encodeContent" class="p-6">
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-medium mb-2" for="hiddenMessage">Pesan Rahasia</label>
+                    <textarea id="hiddenMessage" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Masukkan pesan yang ingin disembunyikan"></textarea>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-medium mb-2">Gambar Pembawa (Cover Image)</label>
+                    <div id="imageDropzone" class="dropzone">
+                        <img id="imagePreview" alt="Pratinjau gambar akan muncul di sini">
+                        <div id="dropzoneContent">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            <p class="mt-2 text-sm text-gray-600">Seret gambar ke sini atau klik untuk memilih</p>
+                            <p class="mt-1 text-xs text-gray-500">Format yang didukung: JPG, PNG</p>
+                        </div>
+                    </div>
+                    <input type="file" id="imageInput" accept="image/jpeg,image/png" class="hidden">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="usePassword" class="rounded text-blue-500">
+                        <span class="ml-2 text-gray-700">Gunakan password</span>
+                    </label>
+                    <input type="password" id="encryptPassword" class="w-full mt-2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 hidden" placeholder="Masukkan password">
+                </div>
+                
+                <button id="encodeBtn" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md shadow-md action-btn" disabled>
+                    Sembunyikan Pesan
+                </button>
+                
+                <div id="encodeResult" class="result-box hidden">
+                    <h3 class="font-bold mb-2">Hasil:</h3>
+                    <div class="flex flex-col md:flex-row gap-4">
+                        <div class="flex-1">
+                            <img id="encodedImage" class="w-full h-auto rounded-md" alt="Gambar dengan pesan tersembunyi">
+                        </div>
+                        <div class="flex-1">
+                            <button id="downloadEncoded" class="w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white font-medium rounded-md mb-3">
+                                Unduh Gambar
+                            </button>
+                            <div class="bg-white p-3 rounded-md border border-gray-200">
+                                <p><strong>Ukuran asli:</strong> <span id="originalSize">-</span></p>
+                                <p><strong>Penyisipan berhasil:</strong> <span id="insertionSuccess">-</span></p>
+                                <p><strong>Kapasitas tersedia:</strong> <span id="availableCapacity">-</span></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Decode Tab Content -->
+            <div id="decodeContent" class="p-6 tab-hidden">
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-medium mb-2">Gambar dengan Pesan Tersembunyi</label>
+                    <div id="stegImageDropzone" class="dropzone">
+                        <img id="stegImagePreview" alt="Pratinjau gambar akan muncul di sini">
+                        <div id="stegDropzoneContent">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            <p class="mt-2 text-sm text-gray-600">Seret gambar ke sini atau klik untuk memilih</p>
+                        </div>
+                    </div>
+                    <input type="file" id="stegImageInput" accept="image/jpeg,image/png" class="hidden">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="checkPassword" class="rounded text-blue-500">
+                        <span class="ml-2 text-gray-700">Gunakan password</span>
+                    </label>
+                    <input type="password" id="decryptPassword" class="w-full mt-2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 hidden" placeholder="Masukkan password">
+                </div>
+                
+                <button id="decodeBtn" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md shadow-md action-btn" disabled>
+                    Ekstrak Pesan
+                </button>
+                
+                <div id="decodeResult" class="result-box hidden">
+                    <h3 class="font-bold mb-2">Pesan yang Diekstrak:</h3>
+                    <div id="extractedMessage" class="bg-white p-4 rounded-md border border-gray-200 whitespace-pre-wrap"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-8 text-center text-sm text-gray-500">
+            <p>Aplikasi ini menggunakan teknik steganografi LSB (Least Significant Bit) untuk menyembunyikan pesan dalam gambar.</p>
+            <p class="mt-1">Gambar yang dihasilkan terlihat seperti biasa tetapi mengandung pesan rahasia.</p>
+        </div>
+    </div>
+    
+    <script>
+        // Elemen UI
+        const encodeTab = document.getElementById('encodeTab');
+        const decodeTab = document.getElementById('decodeTab');
+        const encodeContent = document.getElementById('encodeContent');
+        const decodeContent = document.getElementById('decodeContent');
+        
+        // Encode elements
+        const imageDropzone = document.getElementById('imageDropzone');
+        const imageInput = document.getElementById('imageInput');
+        const imagePreview = document.getElementById('imagePreview');
+        const hiddenMessage = document.getElementById('hiddenMessage');
+        const usePassword = document.getElementById('usePassword');
+        const encryptPassword = document.getElementById('encryptPassword');
+        const encodeBtn = document.getElementById('encodeBtn');
+        const encodeResult = document.getElementById('encodeResult');
+        const encodedImage = document.getElementById('encodedImage');
+        const downloadEncoded = document.getElementById('downloadEncoded');
+        const originalSize = document.getElementById('originalSize');
+        const insertionSuccess = document.getElementById('insertionSuccess');
+        const availableCapacity = document.getElementById('availableCapacity');
+        
+        // Decode elements
+        const stegImageDropzone = document.getElementById('stegImageDropzone');
+        const stegImageInput = document.getElementById('stegImageInput');
+        const stegImagePreview = document.getElementById('stegImagePreview');
+        const checkPassword = document.getElementById('checkPassword');
+        const decryptPassword = document.getElementById('decryptPassword');
+        const decodeBtn = document.getElementById('decodeBtn');
+        const decodeResult = document.getElementById('decodeResult');
+        const extractedMessage = document.getElementById('extractedMessage');
+        
+        // Tab switching
+        encodeTab.addEventListener('click', () => {
+            encodeContent.classList.remove('tab-hidden');
+            decodeContent.classList.add('tab-hidden');
+            encodeTab.classList.add('border-blue-500', 'text-blue-600', 'bg-blue-50');
+            encodeTab.classList.remove('text-gray-500');
+            decodeTab.classList.add('text-gray-500');
+            decodeTab.classList.remove('border-blue-500', 'text-blue-600', 'bg-blue-50');
+        });
+        
+        decodeTab.addEventListener('click', () => {
+            decodeContent.classList.remove('tab-hidden');
+            encodeContent.classList.add('tab-hidden');
+            decodeTab.classList.add('border-blue-500', 'text-blue-600', 'bg-blue-50');
+            decodeTab.classList.remove('text-gray-500');
+            encodeTab.classList.add('text-gray-500');
+            encodeTab.classList.remove('border-blue-500', 'text-blue-600', 'bg-blue-50');
+        });
+        
+        // Password toggle for encode
+        usePassword.addEventListener('change', () => {
+            if (usePassword.checked) {
+                encryptPassword.classList.remove('hidden');
+            } else {
+                encryptPassword.classList.add('hidden');
+            }
+        });
+        
+        // Password toggle for decode
+        checkPassword.addEventListener('change', () => {
+            if (checkPassword.checked) {
+                decryptPassword.classList.remove('hidden');
+            } else {
+                decryptPassword.classList.add('hidden');
+            }
+        });
+        
+        // Image dropzone for encode
+        imageDropzone.addEventListener('click', () => imageInput.click());
+        imageDropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            imageDropzone.classList.add('active');
+        });
+        imageDropzone.addEventListener('dragleave', () => {
+            imageDropzone.classList.remove('active');
+        });
+        imageDropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            imageDropzone.classList.remove('active');
+            if (e.dataTransfer.files.length) {
+                imageInput.files = e.dataTransfer.files;
+                handleImageUpload(imageInput.files[0], imagePreview);
+            }
+        });
+        
+        // Image dropzone for decode
+        stegImageDropzone.addEventListener('click', () => stegImageInput.click());
+        stegImageDropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            stegImageDropzone.classList.add('active');
+        });
+        stegImageDropzone.addEventListener('dragleave', () => {
+            stegImageDropzone.classList.remove('active');
+        });
+        stegImageDropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            stegImageDropzone.classList.remove('active');
+            if (e.dataTransfer.files.length) {
+                stegImageInput.files = e.dataTransfer.files;
+                handleImageUpload(stegImageInput.files[0], stegImagePreview);
+            }
+        });
+        
+        // Image input change handlers
+        imageInput.addEventListener('change', () => {
+            if (imageInput.files.length) {
+                handleImageUpload(imageInput.files[0], imagePreview);
+            }
+        });
+        
+        stegImageInput.addEventListener('change', () => {
+            if (stegImageInput.files.length) {
+                handleImageUpload(stegImageInput.files[0], stegImagePreview);
+            }
+        });
+        
+        function handleImageUpload(file, previewElement) {
+            if (!file.type.match('image.*')) {
+                alert('Hanya file gambar yang diperbolehkan');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewElement.src = e.target.result;
+                previewElement.style.display = 'block';
+                
+                // Hide the dropzone content
+                if (previewElement === imagePreview) {
+                    document.getElementById('dropzoneContent').style.display = 'none';
+                    encodeBtn.disabled = false;
+                } else {
+                    document.getElementById('stegDropzoneContent').style.display = 'none';
+                    decodeBtn.disabled = false;
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // Steganography functions
+        function stringToBinary(str) {
+            return str.split('').map(char => {
+                return char.charCodeAt(0).toString(2).padStart(8, '0');
+            }).join('');
+        }
+        
+        function binaryToString(binary) {
+            let str = '';
+            for (let i = 0; i < binary.length; i += 8) {
+                const byte = binary.substr(i, 8);
+                str += String.fromCharCode(parseInt(byte, 2));
+            }
+            return str;
+        }
+        
+        function encryptMessage(message, password) {
+            if (!password) return message;
+            
+            // Simple XOR encryption (can be enhanced with more secure algorithms)
+            let result = '';
+            for (let i = 0; i < message.length; i++) {
+                const charCode = message.charCodeAt(i) ^ password.charCodeAt(i % password.length);
+                result += String.fromCharCode(charCode);
+            }
+            return result;
+        }
+        
+        function decryptMessage(encryptedMessage, password) {
+            if (!password) return encryptedMessage;
+            return encryptMessage(encryptedMessage, password); // XOR is symmetric
+        }
+        
+        function embedMessage(imageData, message, password, callback) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                
+                const originalPixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const pixels = originalPixels.data;
+                
+                // Encrypt the message first
+                const encryptedMessage = encryptMessage(message, password);
+                
+                // Convert message to binary
+                let binaryMessage = stringToBinary(encryptedMessage);
+                
+                // Add a delimiter to mark the end of the message
+                binaryMessage += '00000000'; // NULL character to mark end
+                
+                if (binaryMessage.length > (pixels.length / 4 * 3)) {
+                    callback(null, false, 'Pesan terlalu panjang untuk gambar ini');
+                    return;
+                }
+                
+                let messageIndex = 0;
+                
+                for (let i = 0; i < pixels.length; i += 4) {
+                    if (messageIndex < binaryMessage.length) {
+                        // Red channel
+                        pixels[i] = (pixels[i] & 0xFE) | parseInt(binaryMessage[messageIndex++], 10);
+                        if (messageIndex >= binaryMessage.length) break;
+                        
+                        // Green channel
+                        pixels[i+1] = (pixels[i+1] & 0xFE) | parseInt(binaryMessage[messageIndex++], 10);
+                        if (messageIndex >= binaryMessage.length) break;
+                        
+                        // Blue channel
+                        pixels[i+2] = (pixels[i+2] & 0xFE) | parseInt(binaryMessage[messageIndex++], 10);
+                        if (messageIndex >= binaryMessage.length) break;
+                    }
+                }
+                
+                ctx.putImageData(originalPixels, 0, 0);
+                
+                const embeddedImage = canvas.toDataURL('image/png');
+                callback(embeddedImage, true, `Pesan berhasil disembunyikan (${message.length} karakter)`);
+            };
+            img.src = imageData;
+        }
+        
+        function extractMessage(imageData, password, callback) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                
+                const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+                
+                let binaryMessage = '';
+                let messageEnd = false;
+                
+                for (let i = 0; i < pixels.length; i += 4) {
+                    // Extract LSB from each color channel
+                    binaryMessage += (pixels[i] & 1).toString();
+                    binaryMessage += (pixels[i+1] & 1).toString();
+                    binaryMessage += (pixels[i+2] & 1).toString();
+                    
+                    // Check for null terminator every 8 bits
+                    for (let j = 8; j <= binaryMessage.length; j += 8) {
+                        const currentByte = binaryMessage.substring(j-8, j);
+                        if (currentByte === '00000000') {
+                            messageEnd = true;
+                            binaryMessage = binaryMessage.substring(0, j-8);
+                            break;
+                        }
+                    }
+                    
+                    if (messageEnd) break;
+                }
+                
+                if (!binaryMessage.length) {
+                    callback(null, false, 'Tidak menemukan pesan tersembunyi');
+                    return;
+                }
+                
+                // Convert binary to string
+                let message = binaryToString(binaryMessage);
+                
+                // Decrypt if password was used
+                message = decryptMessage(message, password);
+                
+                callback(message, true, 'Pesan berhasil diekstrak');
+            };
+            img.src = imageData;
+        }
+        
+        // Encode button handler
+        encodeBtn.addEventListener('click', () => {
+            if (!hiddenMessage.value.trim()) {
+                alert('Silakan masukkan pesan yang ingin disembunyikan');
+                return;
+            }
+            
+            if (!imageInput.files.length) {
+                alert('Silakan pilih gambar pembawa');
+                return;
+            }
+            
+            encodeBtn.disabled = true;
+            encodeBtn.textContent = 'Memproses...';
+            
+            const password = usePassword.checked ? encryptPassword.value : null;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                embedMessage(e.target.result, hiddenMessage.value, password, (image, success, message) => {
+                    encodeBtn.disabled = false;
+                    encodeBtn.textContent = 'Sembunyikan Pesan';
+                    
+                    if (success) {
+                        encodedImage.src = image;
+                        encodeResult.classList.remove('hidden');
+                        
+                        // Calculate original image size
+                        const originalImgSize = imageInput.files[0].size / 1024;
+                        originalSize.textContent = originalImgSize.toFixed(2) + ' KB';
+                        
+                        // Calculate capacity
+                        const canvas = document.createElement('canvas');
+                        const img = new Image();
+                        img.onload = function() {
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0);
+                            
+                            const pixelCount = img.width * img.height;
+                            const capacityBytes = Math.floor(pixelCount * 3 / 8) - 1; // -1 for null terminator
+                            availableCapacity.textContent = `${capacityBytes} karakter (sekitar ${Math.floor(capacityBytes / 1024)} KB)`;
+                            
+                            insertionSuccess.textContent = message;
+                        };
+                        img.src = e.target.result;
+                    } else {
+                        alert(message);
+                    }
+                });
+            };
+            reader.readAsDataURL(imageInput.files[0]);
+        });
+        
+        // Decode button handler
+        decodeBtn.addEventListener('click', () => {
+            if (!stegImageInput.files.length) {
+                alert('Silakan pilih gambar dengan pesan tersembunyi');
+                return;
+            }
+            
+            decodeBtn.disabled = true;
+            decodeBtn.textContent = 'Memproses...';
+            
+            const password = checkPassword.checked ? decryptPassword.value : null;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                extractMessage(e.target.result, password, (message, success) => {
+                    decodeBtn.disabled = false;
+                    decodeBtn.textContent = 'Ekstrak Pesan';
+                    
+                    if (success) {
+                        decodeResult.classList.remove('hidden');
+                        extractedMessage.textContent = message;
+                    } else {
+                        alert('Gagal mengekstrak pesan. Pastikan gambar mengandung pesan tersembunyi dan password benar jika digunakan.');
+                    }
+                });
+            };
+            reader.readAsDataURL(stegImageInput.files[0]);
+        });
+        
+        // Download encoded image
+        downloadEncoded.addEventListener('click', () => {
+            if (!encodedImage.src) {
+                alert('Tidak ada gambar untuk diunduh');
+                return;
+            }
+            
+            const link = document.createElement('a');
+            link.href = encodedImage.src;
+            link.download = 'secret_image.png';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+        
+        // Enable encode button when there's message and image
+        hiddenMessage.addEventListener('input', () => {
+            encodeBtn.disabled = !(hiddenMessage.value.trim() && imageInput.files.length);
+        });
+    </script>
+</body>
+</html>
